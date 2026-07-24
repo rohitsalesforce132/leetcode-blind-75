@@ -139,9 +139,9 @@ def inorder(node, result=None):
 
 
 # --- INORDER TRAVERSAL (iterative) ---
-# WHY a stack? DFS goes DEEP before going WIDE. A stack's LIFO (last in,
-# first out) behavior matches "go as deep as you can, then backtrack."
-# We push all left children first, then pop and process, then go right.
+# Why a stack? DFS goes DEEP before going WIDE. A stack's LIFO behavior
+# matches "go as deep as you can, then backtrack." We push all left
+# children, then pop/process, then go right.
 def inorder_iterative(root):
     """Left → Node → Right using an explicit stack."""
     result = []
@@ -149,15 +149,12 @@ def inorder_iterative(root):
     current = root
 
     while current is not None or stack:
-        # Walk down the left spine, pushing every node we pass.
-        while current is not None:
+        while current is not None:       # walk down the left spine
             stack.append(current)
             current = current.left
-        # current is None → we hit the bottom of this left spine.
-        current = stack.pop()
+        current = stack.pop()            # bottom of the left spine
         result.append(current.val)
-        # Now explore this node's right subtree.
-        current = current.right
+        current = current.right          # explore right subtree
 
     return result
 
@@ -666,17 +663,11 @@ VALIDATE A BST (Common interview question):
     "Is this binary tree a valid BST?"
 
     The trick: pass down a VALID RANGE (min, max) for each node.
-    - Left child must be less than parent (max = parent's value)
-    - Right child must be greater than parent (min = parent's value)
-
     As you descend, the range NARROWS:
-
-         node must be in (min, max)
          going LEFT  → new max = node.val   (everything must be smaller)
          going RIGHT → new min = node.val   (everything must be larger)
 
-    Trace on this INVALID tree (10 is in 5's right subtree, but 10 > 5
-    only violates at the root because 5 < 8... actually let's check):
+    Trace on this INVALID tree:
 
             8
            / \
@@ -685,13 +676,13 @@ VALIDATE A BST (Common interview question):
             6   14     ← 6 is in 8's right subtree but 6 < 8 → INVALID
 
     At node 10: range is (8, +inf). OK.
-    Going left to 6:  range becomes (8, 10). 6 < 8 → FAIL. ✅ caught.
+    Going left to 6: range becomes (8, 10). 6 < 8 → FAIL. ✅ caught.
 
 COMMON MISTAKE — only comparing a node to its DIRECT parent:
     Many people check only `node.left.val < node.val < node.right.val`.
-    That passes the invalid tree above (6 < 10 and 10's children are fine
-    locally) — but it's NOT a valid BST because 6 is in 8's right subtree.
-    You MUST track the full (min, max) range inherited from all ancestors.
+    That passes the invalid tree above (6 < 10 locally) — but it's NOT a
+    valid BST because 6 is in 8's right subtree. You MUST track the full
+    (min, max) range inherited from all ancestors.
 '''
 
 def is_valid_bst(node, min_val=float('-inf'), max_val=float('inf')):
@@ -755,9 +746,9 @@ print(is_valid_bst_iterative(bad_bst)) # False
 #   LCA(5, 4)  = 5   (4 is a descendant of 5, so 5 itself is the LCA)
 #   LCA(6, 4)  = 5
 #
-# Recursive insight: at each node, ask "do p or q appear in my left subtree?
-# in my right subtree? am I myself p or q?" The node where the answer
-# "spreads across both sides" (or hits the node itself) is the LCA.
+# Recursive insight: ask each subtree "did you find p or q?" If p and q
+# are found on DIFFERENT sides of a node, that node is the LCA. If a node
+# IS p or q, it's a candidate (the other may be below it).
 
 def lowest_common_ancestor(root, p, q):
     """Return the LCA of nodes p and q in a binary tree."""
@@ -1063,39 +1054,18 @@ Real-world analogy: AUTOCOMPLETE on your phone.
     A trie is the data structure that makes this instant.
 
 A trie is a TREE where each node represents ONE LETTER.
-Words are stored as paths from the root down.
+Words are stored as paths from the root down:
 
-    Root
-      ↓
-      a
-      ↓
-      p
-      ↓
-      p          ← "app" ends here (is_end = True)
-      ↓
-      l
-      ↓
-      e          ← "apple" ends here (is_end = True)
+    Root → a → p → p* → l → e*    ("app", "apple" — * marks word endings)
 
 SHARING PREFIXES — the key efficiency win:
     Insert "app", "apple", "apply", "application" and they SHARE the
     "app" prefix. You store "app" once, not four times.
 
-    Root
-      ↓ a
-      ↓ p
-      ↓ p            ← end of "app"
-      ├─ l
-      │   ├─ e       ← end of "apple"
-      │   └─ y       ← end of "apply"
-      └─ l
-          ↓ i
-          ↓ c
-          ↓ a
-          ↓ t
-          ↓ i
-          ↓ o
-          ↓ n        ← end of "application"
+    Root → a → p → p*           (* = end of "app")
+                     ├─ l → e*   ("apple")
+                     ├─ l → y*   ("apply")
+                     └─ l → i → c → a → t → i → o → n*  ("application")
 
 Each node has:
     - A dictionary of children (next letter → child node)
@@ -1203,17 +1173,13 @@ WORD SEARCH II (LeetCode #212) — the classic trie interview problem
 Given a 2D board of letters and a list of words, find every word that can
 be formed by a path on the board (moving to adjacent cells, no reuse).
 
-BRUTE FORCE: for each word, run DFS on the board from every cell. If there
-are W words and the board is N cells with branching ~3^L, that's O(W·N·3^L).
+BRUTE FORCE: for each word, run DFS on the board from every cell.
+If there are W words and the board has N cells with branching ~3^L
+(L = word length), that's O(W·N·3^L).
 
 BETTER: insert ALL words into a TRIE. Run ONE DFS from every cell, walking
 the trie as you go. Prune immediately when the current path isn't a prefix
-of ANY word. This collapses W independent searches into one shared search.
-
-Why a trie? Because every word that starts with "app" shares the same DFS
-prefix on the board — no need to redo that work for "apple", "apply", etc.
-
-We won't run the full LeetCode solution here (it's long), but the skeleton:
+of ANY word — this collapses W independent searches into one shared search.
 
     def find_words(board, words):
         trie = Trie()
@@ -1229,13 +1195,13 @@ We won't run the full LeetCode solution here (it's long), but the skeleton:
                 return                      # prune: not a prefix of any word
             node = node.children[char]
             if node.is_end:
-                found.add(path + char)      # collected a complete word
+                found.add(path + char)
             board[r][c] = "#"               # mark visited
             for dr, dc in [(1,0),(-1,0),(0,1),(0,-1)]:
                 nr, nc = r+dr, c+dc
                 if 0 <= nr < rows and 0 <= nc < cols and board[nr][nc] != "#":
                     dfs(nr, nc, node, path + char)
-            board[r][c] = char              # unmark (backtrack)
+            board[r][c] = char              # restore (backtrack)
 
         for r in range(rows):
             for c in range(cols):
@@ -1243,11 +1209,9 @@ We won't run the full LeetCode solution here (it's long), but the skeleton:
         return list(found)
 
 Key tricks:
-  - Mark the cell as visited by temporarily overwriting it ("#"), then RESTORE
+  - Temporarily overwrite a cell with "#" to mark it visited, then RESTORE
     it after the recursive calls (backtracking).
-  - Collect into a set to avoid duplicates.
-  - Prune the instant the current path leaves the trie — this is what makes
-    it fast.
+  - Collect into a set to dedupe. Prune the instant the path leaves the trie.
 '''
 
 
@@ -1259,17 +1223,12 @@ WHEN TO USE A TRIE?
     4. Word Search II (LeetCode #212) — find words on a grid
     5. T9 / predictive text on old phone keypads
 
-COMPLEXITY:
-    - Insert/search: O(m) where m = length of word
-    - Does NOT depend on how many words are stored! That's the magic.
-    - Compare: searching in a hash map is O(m) for hash computation,
-      but a trie also gives you PREFIX search which hash maps cannot.
-
-TRIE vs HASH SET:
-    Hash set: O(m) lookup for an EXACT word. No prefix queries.
-    Trie:     O(m) lookup for an exact word AND O(m + output) for "all words
-              starting with prefix P". A hash set would have to scan every
-              stored word to answer that — O(total_chars).
+COMPLEXITY & TRIE vs HASH SET:
+    - Insert/search: O(m) where m = word length — INDEPENDENT of how many
+      words are stored. That's the magic.
+    - A hash set is also O(m) for an EXACT-word lookup, but a trie also gives
+      you prefix queries in O(m + output), which a hash set cannot (it would
+      have to scan every stored word — O(total_chars)).
 
 COMMON MISTAKES WITH TRIES
 --------------------------
@@ -1280,7 +1239,6 @@ COMMON MISTAKES WITH TRIES
 2. NOT DISTINGUISHING search vs starts_with.
    search("app") → True only if "app" was inserted as a word.
    starts_with("app") → True if ANY word starts with "app".
-   These are different questions; don't confuse them.
 
 3. USING A LIST INSTEAD OF A DICT FOR children (when chars are unconstrained).
    For lowercase a–z only, a fixed 26-element list is faster. For arbitrary

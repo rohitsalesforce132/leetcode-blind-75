@@ -252,19 +252,15 @@ print(daily_temperatures([73, 74, 75, 71, 69, 72, 76, 73]))
 
 '''
 DRY RUN: daily_temperatures([73, 74, 75, 71, 69, 72, 76, 73])
-    i | temps[i] | stack before | pops?                           | result changes | stack after
-    --|---------|--------------|---------------------------------|----------------|------------
-    0 | 73      | []           | stack empty → no pop            | -              | [0]
-    1 | 74      | [0]          | 74>73 → pop 0                   | result[0]=1    | [1]
-    2 | 75      | [1]          | 75>74 → pop 1                   | result[1]=1    | [2]
-    3 | 71      | [2]          | 71<75 → no pop                  | -              | [2,3]
-    4 | 69      | [2,3]        | 69<71 → no pop                  | -              | [2,3,4]
-    5 | 72      | [2,3,4]      | 72>69 → pop 4; 72>71 → pop 3    | r[4]=1,r[3]=2  | [2,5]
-    6 | 76      | [2,5]        | 76>72 → pop 5; 76>75 → pop 2    | r[5]=1,r[2]=4  | [6]
-    7 | 73      | [6]          | 73<76 → no pop                  | -              | [6,7]
-
-    Final result: [1, 1, 4, 2, 1, 1, 0, 0]
-    Indices 6 and 7 never got popped → they stay 0 (no warmer day after them).
+    i=0 (73): stack empty → push 0
+    i=1 (74): 74>73 → pop 0 (r[0]=1); push 1
+    i=2 (75): 75>74 → pop 1 (r[1]=1); push 2
+    i=3 (71): 71<75 → push 3
+    i=4 (69): 69<71 → push 4
+    i=5 (72): 72>69 → pop 4 (r[4]=1); 72>71 → pop 3 (r[3]=2); 72<75 → push 5
+    i=6 (76): 76>72 → pop 5 (r[5]=1); 76>75 → pop 2 (r[2]=4); push 6
+    i=7 (73): 73<76 → push 7
+    Result: [1, 1, 4, 2, 1, 1, 0, 0]. Indices 6,7 never popped → stay 0.
 '''
 
 
@@ -294,16 +290,12 @@ ALGORITHM (textbook stack use):
     of the stack.
 
 STEP-BY-STEP: ["4", "13", "5", "/", "+"]
-    token  | stack before | action                 | stack after
-    -------|--------------|------------------------|------------
-    "4"    | []           | push 4                 | [4]
-    "13"   | [4]          | push 13                | [4, 13]
-    "5"    | [4, 13]      | push 5                 | [4, 13, 5]
-    "/"    | [4,13,5]     | pop b=5, pop a=13;     | [4, 2]
-           |              | 13 / 5 = 2 (int div)   |
-    "+"    | [4, 2]       | pop b=2, pop a=4;      | [6]
-           |              | 4 + 2 = 6              |
-    Result: 6    (which is 4 + (13/5))
+    "4"  → push 4          → [4]
+    "13" → push 13         → [4, 13]
+    "5"  → push 5          → [4, 13, 5]
+    "/"  → pop b=5, a=13; 13/5=2 → [4, 2]
+    "+"  → pop b=2, a=4;  4+2=6  → [6]
+    Result: 6  (= 4 + (13/5))
 
 NOTE THE ORDER: For "a b -" we compute a - b. We pop b FIRST (it was pushed
 last), then a. Get this backwards and you'll compute b - a. This is THE
@@ -338,9 +330,8 @@ def eval_rpn(tokens):
 print("\n--- Evaluate Reverse Polish Notation ---")
 print(eval_rpn(["2", "1", "+", "3", "*"]))       # (2+1)*3 = 9
 print(eval_rpn(["4", "13", "5", "/", "+"]))      # 4 + (13/5) = 6
-print(eval_rpn(["10", "6", "9", "3", "+", "-11",
-                "*", "/", "*", "17", "+", "5", "+"]))
-# = 22  (the classic LeetCode example)
+print(eval_rpn(["10", "6", "9", "3", "+", "-11", "*", "/", "*",
+                "17", "+", "5", "+"]))            # = 22 (classic LeetCode)
 
 
 '''
@@ -805,36 +796,21 @@ WHY 3 POINTERS? The moment we set current.next = prev, we have BROKEN the
 
 STEP-BY-STEP POINTER DIAGRAM (reverse 1 → 2 → 3 → None):
 
-  Initial:
-    prev=None   current=[1]   [1] → [2] → [3] → None
+  Initial:  prev=None   current=[1]   [1] → [2] → [3] → None
 
-  Iteration 1 (process [1]):
-    next_temp = current.next          → next_temp = [2]    (SAVE forward link)
-    current.next = prev               → [1].next = None    (REVERSE pointer)
+  Iter 1 (process [1]):  next_temp=[2]; [1].next=None; prev=[1]; current=[2]
         None  ←  [1]     [2] → [3] → None
-        prev↑       current↑   next_temp↑
-    prev = current                    → prev = [1]
-    current = next_temp               → current = [2]
-        None  ←  [1]     [2] → [3] → None
-                   ↑        ↑
-                 prev     current
+        prev↑          current↑
 
-  Iteration 2 (process [2]):
-    next_temp = [3]
-    current.next = prev               → [2].next = [1]
+  Iter 2 (process [2]):  next_temp=[3]; [2].next=[1]; prev=[2]; current=[3]
         None  ←  [1]  ←  [2]     [3] → None
-        prev↑          current↑   next_temp↑
-    prev = [2];  current = [3]
+        prev↑          current↑
 
-  Iteration 3 (process [3]):
-    next_temp = None
-    current.next = prev               → [3].next = [2]
-        None  ←  [1]  ←  [2]  ←  [3]     None
-                            prev↑   current↑  next_temp↑
-    prev = [3];  current = None  → loop ends
+  Iter 3 (process [3]):  next_temp=None; [3].next=[2]; prev=[3]; current=None
+        None  ←  [1]  ←  [2]  ←  [3]     loop ends
+                            prev↑
 
-  Return prev = [3], the new head.
-  Final list:  3 → 2 → 1 → None   ✓
+  Return prev = [3] → new head. Final list: 3 → 2 → 1 → None ✓
 
 COMMON MISTAKES (Reverse)
     1. Saving next_temp AFTER setting current.next = prev. By then the
@@ -889,24 +865,14 @@ WHY A DUMMY HEAD? Without it, the very first append needs a special case
     every append — including the first — is just `tail.next = ...; tail = ...`.
 
 POINTER DIAGRAM (merging 1→2→4 and 1→3→4):
-
-  Start:
-    dummy → ?           tail=dummy
-    L1: [1] → [2] → [4]    L2: [1] → [3] → [4]
-
-  Compare 1 vs 1 → take L1's 1 (tie-break to L1):
-    dummy → [1]          tail=[1]; L1 → [2] → [4]
-  Compare 2 vs 1 → take L2's 1:
-    dummy → [1] → [1]    tail=[1'] ; L2 → [3] → [4]
-  Compare 2 vs 3 → take L1's 2:
-    dummy → [1] → [1] → [2]   tail=[2]; L1 → [4]
-  Compare 4 vs 3 → take L2's 3:
-    ...→ [2] → [3]            tail=[3]; L2 → [4]
-  Compare 4 vs 4 → take L1's 4:
-    ...→ [3] → [4]            tail=[4]; L1 = None
-  L1 is None → attach L2's remainder:
-    ...→ [4] → [4] → None
-  Return dummy.next → head of merged list: 1 → 1 → 2 → 3 → 4 → 4
+    dummy → ?   tail=dummy;  L1:[1]→[2]→[4]  L2:[1]→[3]→[4]
+    1 vs 1 → take L1's 1: dummy→[1]         L1:[2]→[4]
+    2 vs 1 → take L2's 1: dummy→[1]→[1]     L2:[3]→[4]
+    2 vs 3 → take L1's 2: dummy→[1]→[1]→[2] L1:[4]
+    4 vs 3 → take L2's 3: ...→[2]→[3]       L2:[4]
+    4 vs 4 → take L1's 4: ...→[3]→[4]       L1=None
+    L1=None → attach L2's remainder: ...→[4]→[4]→None
+    Return dummy.next → 1 → 1 → 2 → 3 → 4 → 4
 
 COMMON MISTAKES (Merge)
     1. Advancing the WRONG list after appending. If you took from L1, move
@@ -1067,25 +1033,14 @@ THE TRICK (two phases):
              is the cycle's start.
 
 WHY DOES PHASE 2 WORK? (the math)
-    Let:
-      L = distance from head to cycle start
-      C = length of the cycle
-      x = distance from cycle start to the meeting point (inside the cycle)
-
-    When they meet:
-      slow has traveled:  L + x
-      fast has traveled:  L + x + k*C   (fast did some extra full loops)
-      fast = 2 * slow  →  L + x + k*C = 2(L + x)
-      →  L + x + k*C = 2L + 2x
-      →  k*C = L + x
-      →  L = k*C - x      ← THE KEY EQUATION
-
-    L = k*C - x means: starting from the HEAD and walking L steps lands you
-    at the cycle start. Starting from the MEETING point and walking (k*C - x)
-    steps ALSO lands you at the cycle start (because k*C is full loops, and
-    -x backs up to the start). So if both pointers walk one step at a time,
-    one from head and one from meeting point, they meet exactly at the cycle
-    start after L steps. Elegant!
+    Let L = distance head→cycle start, C = cycle length, x = distance from
+    cycle start to meeting point. When they meet: slow = L+x, fast = L+x+k*C.
+    Since fast = 2·slow:  L + x + k*C = 2(L + x)  →  L = k*C - x.
+    This says: walking L steps from the HEAD reaches the cycle start, AND
+    walking (k*C - x) steps from the MEETING point also reaches the cycle
+    start (k*C is full loops, -x backs up to start). So two pointers — one
+    from head, one from meeting point, each moving 1 step — meet at the
+    cycle start after L steps. Elegant!
 
 COMMON MISTAKES (Cycle Start)
     1. Returning the meeting point from Phase 1 — that's NOT the cycle start.

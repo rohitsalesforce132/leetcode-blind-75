@@ -1,37 +1,45 @@
 '''
-CHAPTER 7: ERROR HANDLING & FILE I/O
-=====================================
+CHAPTER 7: ERROR HANDLING & FILE I/O — THE COMPLETE DEEP DIVE
+===============================================================
 
 "In real software, things go wrong. Files don't exist, APIs timeout,
-users enter bad data. Error handling is how your program survives."
+users enter bad data, networks fail. Error handling is how your program
+SURVIVES these situations instead of crashing. File I/O is how your
+program PERSISTS data to disk."
 
 ---
 
-PART 1: EXCEPTIONS — WHAT ARE THEY?
-====================================
+PART 1: EXCEPTIONS — WHAT ARE THEY AND WHY?
+============================================
 
 Real-world analogy: DRIVING A CAR.
 
     Normal flow: You drive to work. Easy.
     Exception: You get a flat tire.
 
-    WITHOUT error handling: You crash. (Program terminates)
-    WITH error handling: You pull over, change the tire, continue.
+    WITHOUT a spare tire: You're stranded. (Program crashes)
+    WITH a spare tire: You change it and continue. (Exception handled)
 
 In Python, when something goes wrong, an EXCEPTION is "raised" (thrown).
-If you don't handle it, the program CRASHES with a traceback.
+If nobody handles it, the program CRASHES with a traceback.
 
     >>> 10 / 0
     ZeroDivisionError: division by zero
+
     >>> "hello" + 5
     TypeError: can only concatenate str (not "int") to str
+
     >>> my_list[100]
     IndexError: list index out of range
+
+    >>> undefined_variable
+    NameError: name 'undefined_variable' is not defined
 '''
 
 # --- UNHANDLED EXCEPTION → CRASH ---
 # Uncomment to see the crash:
-# print(10 / 0)  # ZeroDivisionError — program stops here
+# result = 10 / 0
+# print("This never prints because the program crashed above")
 
 # --- HANDLED EXCEPTION → CONTINUE ---
 try:
@@ -43,23 +51,27 @@ print(f"Result: {result}")           # Result: 0
 
 
 '''
-PART 2: TRY / EXCEPT / ELSE / FINALLY
-======================================
-
-The complete error handling structure:
+PART 2: TRY / EXCEPT / ELSE / FINALLY — THE COMPLETE STRUCTURE
+================================================================
 
     try:
         # Code that MIGHT fail
     except SomeError as e:
-        # Code that runs IF that specific error occurs
+        # Runs IF that specific error occurs
     except (ErrorA, ErrorB):
-        # Handle multiple error types
+        # Handle multiple error types together
     except Exception as e:
         # Catch ALL errors (use sparingly — be specific!)
     else:
-        # Runs ONLY if NO exception occurred
+        # Runs ONLY if NO exception occurred in try block
     finally:
         # ALWAYS runs, regardless of success or failure
+
+EXECUTION FLOW:
+    1. try block runs
+    2. If exception → matching except block runs → finally runs
+    3. If NO exception → else block runs → finally runs
+    4. finally ALWAYS executes (even if return/break/continue in try)
 '''
 
 # --- COMPLETE EXAMPLE ---
@@ -82,6 +94,38 @@ print(safe_divide(10, 0))         # Error: Cannot divide by zero
 print(safe_divide(10, "two"))     # Error: Wrong type
 
 
+'''
+PART 3: THE EXCEPTION HIERARCHY
+================================
+
+All exceptions in Python form a CLASS HIERARCHY:
+
+    BaseException
+    ├── SystemExit              (sys.exit())
+    ├── KeyboardInterrupt       (Ctrl+C)
+    └── Exception               ← Base class for ALL catchable errors
+        ├── ValueError          (wrong value: int("abc"))
+        ├── TypeError           (wrong type: "hello" + 5)
+        ├── IndexError          (list index out of range)
+        ├── KeyError            (dict key doesn't exist)
+        ├── AttributeError      (method/attribute doesn't exist)
+        ├── ZeroDivisionError   (division by zero)
+        ├── FileNotFoundError   (file not found)
+        ├── NameError           (variable not defined)
+        ├── StopIteration       (iterator exhausted)
+        ├── RuntimeError        (generic runtime error)
+        ├── RecursionError      (too many recursive calls)
+        ├── OverflowError       (number too large)
+        └── OSError             (operating system errors)
+            ├── FileNotFoundError
+            ├── PermissionError
+            ├── TimeoutError
+            └── ConnectionError
+
+KEY INSIGHT: Catching 'Exception' catches ALL the errors under it.
+But it also catches errors you might not expect. BE SPECIFIC.
+'''
+
 # --- CATCHING MULTIPLE ERROR TYPES ---
 def get_element(lst, index):
     """Safely get an element from a list."""
@@ -91,128 +135,128 @@ def get_element(lst, index):
         return f"Error: {type(e).__name__} — {e}"
 
 print(get_element([1, 2, 3], 0))      # 1
-print(get_element([1, 2, 3], 10))     # Error: IndexError — list index out of range
-print(get_element([1, 2, 3], "x"))    # Error: TypeError — list indices must be...
+print(get_element([1, 2, 3], 10))     # Error: IndexError
+print(get_element([1, 2, 3], "x"))    # Error: TypeError
 
 
-# --- RAISING YOUR OWN EXCEPTIONS ---
-def withdraw(balance, amount):
-    """Withdraw money, raising error if insufficient funds."""
-    if amount < 0:
-        raise ValueError("Cannot withdraw negative amount")
-    if amount > balance:
-        raise ValueError(f"Insufficient funds: have ${balance}, need ${amount}")
-    return balance - amount
+'''
+PART 4: RAISING YOUR OWN EXCEPTIONS
+====================================
 
-try:
-    new_balance = withdraw(100, 150)
-except ValueError as e:
-    print(f"Transaction failed: {e}")
-else:
-    print(f"New balance: ${new_balance}")
+You can RAISE exceptions to signal errors in your own code.
+This is how you communicate "something went wrong" to the caller.
+'''
 
-
-# --- CUSTOM EXCEPTION CLASSES ---
-class ValidationError(Exception):
-    """Custom exception for data validation."""
-    pass
-
+# --- RAISE BASIC ---
 def validate_age(age):
     if not isinstance(age, int):
-        raise ValidationError("Age must be an integer")
+        raise TypeError("Age must be an integer")
     if age < 0 or age > 150:
-        raise ValidationError("Age must be between 0 and 150")
+        raise ValueError(f"Age must be between 0 and 150, got {age}")
     return True
 
 try:
     validate_age(-5)
-except ValidationError as e:
+except ValueError as e:
     print(f"Validation error: {e}")
 
-
-# --- FINALLY IS ALWAYS EXECUTED ---
-# Common use: closing files, releasing resources
-def read_config():
+# --- RAISE FROM (EXCEPTION CHAINING) ---
+def process_data(data):
     try:
-        # Simulate reading config
-        data = {"port": 8080}
-        return data
-    except Exception:
-        print("Failed to read config")
-        return {}
-    finally:
-        print("[debug] Config read attempt finished")
+        result = json.loads(data)     # May fail
+    except json.JSONDecodeError as e:
+        raise ValueError("Invalid data format") from e  # Chain the original
 
-print(read_config())
+# --- RE-RAISING ---
+def do_something():
+    try:
+        risky_operation()
+    except SomeError:
+        log_error()
+        raise  # Re-raise the same exception
 
 
 '''
-COMMON PYTHON EXCEPTIONS (MEMORIZE THESE):
-    ValueError         Wrong value (e.g., int("abc"))
-    TypeError          Wrong type (e.g., "hello" + 5)
-    IndexError         List index out of range
-    KeyError           Dict key doesn't exist
-    AttributeError     Calling non-existent method/attribute
-    ZeroDivisionError  Dividing by zero
-    FileNotFoundError  File doesn't exist
-    NameError          Variable not defined
-    StopIteration      Iterator exhausted (used internally by for loops)
-    RuntimeError       Generic runtime error
-    Exception          Base class for ALL exceptions
+PART 5: CUSTOM EXCEPTION CLASSES
+=================================
+
+For production code, define your OWN exception classes.
+This makes error handling more precise and readable.
+'''
+
+class ValidationError(Exception):
+    """Custom exception for data validation failures."""
+    pass
+
+class AuthenticationError(Exception):
+    """Custom exception for authentication failures."""
+    pass
+
+class RateLimitError(Exception):
+    """Custom exception for rate limiting."""
+    def __init__(self, message, retry_after=None):
+        super().__init__(message)
+        self.retry_after = retry_after  # Custom attribute!
+
+def validate_email(email):
+    if "@" not in email:
+        raise ValidationError(f"Invalid email: {email}")
+
+try:
+    validate_email("not-an-email")
+except ValidationError as e:
+    print(f"Caught: {e}")
 
 
----
-
-PART 3: FILE I/O — READING AND WRITING FILES
+'''
+PART 6: FILE I/O — READING AND WRITING FILES
 ==============================================
-'''
 
-# --- WRITING TO A FILE ---
-# 'with' statement automatically closes the file when done.
-# ALWAYS use 'with' for file operations!
+The 'with' statement automatically closes the file when done.
+ALWAYS use 'with' for file operations — it guarantees cleanup even
+if an exception occurs.
 
-# Write mode 'w' (overwrites if file exists)
-with open("/tmp/test_file.txt", "w") as f:
-    f.write("Hello, World!\n")
-    f.write("This is line 2.\n")
-    f.write("This is line 3.\n")
-
-# Write multiple lines at once
-lines = ["Line A\n", "Line B\n", "Line C\n"]
-with open("/tmp/test_file.txt", "a") as f:  # 'a' = append mode
-    f.writelines(lines)
-
-# --- READING FROM A FILE ---
-
-# Read entire file as one string
-with open("/tmp/test_file.txt", "r") as f:
-    content = f.read()
-    print(f"\n--- File Content (read all) ---\n{content}")
-
-# Read line by line (memory-efficient for large files)
-print("--- File Content (line by line) ---")
-with open("/tmp/test_file.txt", "r") as f:
-    for line_num, line in enumerate(f, 1):
-        print(f"  Line {line_num}: {line.strip()}")
-
-# Read all lines into a list
-with open("/tmp/test_file.txt", "r") as f:
-    all_lines = f.readlines()     # Each line includes \n
-    print(f"\nLines as list: {len(all_lines)} lines")
-
-
-'''
 FILE MODES:
     'r'  → Read (default). File must exist.
     'w'  → Write. Creates or OVERWRITES.
     'a'  → Append. Creates or adds to end.
     'r+' → Read and write. File must exist.
     'b'  → Binary mode (e.g., 'rb', 'wb'). For images, audio, etc.
+    'x'  → Exclusive creation. Fails if file already exists.
 '''
 
-# --- WORKING WITH JSON (most common interview/real-world format) ---
 import json
+import csv
 
+# --- WRITING TO A TEXT FILE ---
+with open("/tmp/learning_test.txt", "w") as f:
+    f.write("Hello, World!\n")
+    f.write("This is line 2.\n")
+    f.write("This is line 3.\n")
+
+# Append mode (adds to end without overwriting)
+with open("/tmp/learning_test.txt", "a") as f:
+    f.writelines(["Line A\n", "Line B\n", "Line C\n"])
+
+# --- READING FROM A TEXT FILE ---
+
+# Read entire file as one string:
+with open("/tmp/learning_test.txt", "r") as f:
+    content = f.read()
+    print(f"\n--- Full file ---\n{content}")
+
+# Read line by line (memory-efficient for large files):
+print("--- Line by line ---")
+with open("/tmp/learning_test.txt", "r") as f:
+    for line_num, line in enumerate(f, 1):
+        print(f"  {line_num}: {line.strip()}")
+
+# Read all lines into a list:
+with open("/tmp/learning_test.txt", "r") as f:
+    all_lines = f.readlines()
+    print(f"Lines: {len(all_lines)}")
+
+# --- JSON FILES (most common in APIs and config) ---
 data = {
     "name": "Manav",
     "skills": ["Python", "Azure", "DevOps"],
@@ -220,69 +264,186 @@ data = {
     "salary": None
 }
 
-# Write JSON to file
-with open("/tmp/data.json", "w") as f:
+# Write JSON:
+with open("/tmp/learning_data.json", "w") as f:
     json.dump(data, f, indent=2)
 
-# Read JSON from file
-with open("/tmp/data.json", "r") as f:
+# Read JSON:
+with open("/tmp/learning_data.json", "r") as f:
     loaded = json.load(f)
-    print(f"\n--- JSON ---\n{loaded}")
+    print(f"\n--- JSON ---")
     print(f"Name: {loaded['name']}")
     print(f"Skills: {loaded['skills']}")
 
-# JSON string ↔ Python dict (for API calls)
-json_string = json.dumps(data, indent=2)     # dict → JSON string
-parsed = json.loads(json_string)             # JSON string → dict
+# JSON string ↔ Python dict (for API calls):
+json_string = json.dumps(data, indent=2)
+parsed = json.loads(json_string)
 
-
-# --- WORKING WITH CSV ---
-import csv
-
-# Write CSV
-with open("/tmp/data.csv", "w", newline="") as f:
+# --- CSV FILES ---
+with open("/tmp/learning_data.csv", "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerow(["Name", "Age", "City"])
     writer.writerow(["Alice", 30, "NYC"])
     writer.writerow(["Bob", 25, "LA"])
-    writer.writerow(["Charlie", 35, "Chicago"])
 
-# Read CSV
-with open("/tmp/data.csv", "r") as f:
+with open("/tmp/learning_data.csv", "r") as f:
     reader = csv.reader(f)
     for row in reader:
         print(f"  {row}")
 
-# DictReader (headers become keys)
-with open("/tmp/data.csv", "r") as f:
+# DictReader (column names become keys):
+with open("/tmp/learning_data.csv", "r") as f:
     reader = csv.DictReader(f)
     for row in reader:
         print(f"  {row['Name']} is {row['Age']} from {row['City']}")
 
 
 '''
---- FILE I/O BEST PRACTICES ---
-    1. ALWAYS use 'with open(...) as f:' — auto-closes the file
-    2. Specify encoding for text files: open(path, 'r', encoding='utf-8')
-    3. For large files, iterate line by line (not .read())
-    4. Use os.path.join() for cross-platform paths:
-       import os; path = os.path.join("dir", "file.txt")
-    5. Use pathlib (modern Python):
-       from pathlib import Path; p = Path("dir") / "file.txt"
+PART 7: PATHLIB — MODERN PATH HANDLING
+========================================
 '''
 
-# --- PATHLIB (MODERN PATH HANDLING) ---
 from pathlib import Path
 
-p = Path("/tmp/test_file.txt")
-print(f"\nFile exists: {p.exists()}")         # True
-print(f"File name: {p.name}")                 # test_file.txt
-print(f"File suffix: {p.suffix}")             # .txt
-print(f"Parent dir: {p.parent}")              # /tmp
+# Create paths (cross-platform — works on Windows, Mac, Linux):
+p = Path("/tmp/learning_test.txt")
+print(f"\n--- Pathlib ---")
+print(f"Exists: {p.exists()}")
+print(f"Name: {p.name}")               # learning_test.txt
+print(f"Stem: {p.stem}")               # learning_test (name without extension)
+print(f"Suffix: {p.suffix}")           # .txt
+print(f"Parent: {p.parent}")           # /tmp
 
-# Read file in one line with pathlib
+# Build paths with / operator (cleaner than os.path.join):
+dir_path = Path("/tmp") / "my_project" / "data" / "config.json"
+print(f"Built path: {dir_path}")
+
+# Read a file in one line:
 content = p.read_text()
-print(f"First 20 chars: {content[:20]}...")
+print(f"First line: {content.split(chr(10))[0]}")
+
+# List files in a directory:
+for file in Path("/tmp").glob("learning_*"):
+    print(f"Found: {file.name}")
+
+# Create directories:
+Path("/tmp/learning_dir").mkdir(exist_ok=True)
+
+
+'''
+PART 8: THE CONTEXT MANAGER PROTOCOL
+======================================
+
+The 'with' statement works with any object that implements
+__enter__ and __exit__ methods. You can create your own!
+'''
+
+class FileManager:
+    """Custom context manager for file handling."""
+    def __init__(self, filename, mode):
+        self.filename = filename
+        self.mode = mode
+        self.file = None
+
+    def __enter__(self):
+        self.file = open(self.filename, self.mode)
+        return self.file
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.file:
+            self.file.close()
+        # Return False to propagate exceptions, True to suppress
+        return False
+
+with FileManager("/tmp/learning_test.txt", "r") as f:
+    content = f.read()
+    print(f"\nCustom manager read: {len(content)} chars")
+
+# Using contextlib for a simpler approach:
+from contextlib import contextmanager
+
+@contextmanager
+def open_file(filename, mode):
+    """Simpler context manager using a generator."""
+    f = open(filename, mode)
+    try:
+        yield f
+    finally:
+        f.close()
+
+with open_file("/tmp/learning_test.txt", "r") as f:
+    print(f"contextlib read: {f.readline().strip()}")
+
+
+'''
+PART 9: COMMON PITFALLS
+========================
+'''
+
+# --- PITFALL 1: BARE EXCEPT (catching everything) ---
+# BAD: Catches even KeyboardInterrupt (Ctrl+C) and SystemExit
+# try:
+#     something()
+# except:           # ← Bare except catches EVERYTHING
+#     pass
+
+# GOOD: Catch specific exceptions
+# try:
+#     something()
+# except (ValueError, TypeError) as e:
+#     handle_error(e)
+
+# --- PITFALL 2: SWALLOWING EXCEPTIONS ---
+# BAD: Silently ignoring errors
+# try:
+#     important_operation()
+# except Exception:
+#     pass           # ← Error is swallowed! Nobody knows it happened.
+
+# GOOD: At least log the error
+# try:
+#     important_operation()
+# except Exception as e:
+#     logger.error(f"Operation failed: {e}")
+#     raise          # Re-raise if the caller should handle it
+
+# --- PITFALL 3: NOT CLOSING FILES ---
+# BAD: File might not close if exception occurs
+# f = open("file.txt", "w")
+# f.write("data")
+# something_that_might_crash()  # If this crashes, file stays open!
+# f.close()
+
+# GOOD: Use 'with' (closes automatically even on exception)
+# with open("file.txt", "w") as f:
+#     f.write("data")
+#     something_that_might_crash()  # File still closes!
+
+# --- PITFALL 4: FORGETTING ENCODING ---
+# BAD: May fail on non-UTF-8 systems
+# with open("file.txt", "r") as f:    # Uses system default encoding
+#     content = f.read()
+
+# GOOD: Always specify encoding for text files
+# with open("file.txt", "r", encoding="utf-8") as f:
+#     content = f.read()
+
+# --- PITFALL 5: EXCEPTION ORDER MATTERS ---
+# BAD: Never-reaching specific handler
+# try:
+#     ...
+# except Exception:          # ← Catches everything first!
+#     print("generic")
+# except ValueError:         # ← NEVER reached (Exception already caught it)
+#     print("specific")
+
+# GOOD: Specific FIRST, general LAST
+# try:
+#     ...
+# except ValueError:         # Specific first
+#     print("value error")
+# except Exception:          # General last
+#     print("generic")
 
 
 # === VERIFY EVERYTHING ===
@@ -293,13 +454,15 @@ if __name__ == "__main__":
     print("""
 Key Takeaways:
 1. try/except/else/finally: Handle errors without crashing.
-2. 'finally' ALWAYS runs (use for cleanup/closing resources).
-3. raise: Throw your own exceptions. Create custom exception classes.
-4. ALWAYS use 'with open(...) as f:' for file I/O.
-5. Modes: 'r' read, 'w' write (overwrite), 'a' append.
-6. json.dump/load for JSON files. json.dumps/loads for strings.
-7. csv.writer/reader for CSV files.
-8. pathlib.Path for modern, cross-platform path handling.
+2. 'finally' ALWAYS runs (use for cleanup, closing resources).
+3. Be SPECIFIC with except clauses (avoid bare 'except:').
+4. raise: Throw your own exceptions. Create custom exception classes.
+5. ALWAYS use 'with open(...) as f:' for file I/O.
+6. Modes: 'r' read, 'w' write (overwrite), 'a' append, 'b' binary.
+7. json.dump/load for JSON files. json.dumps/loads for strings.
+8. csv.writer/reader for CSV. DictReader for header-based access.
+9. pathlib.Path for modern, cross-platform path handling.
+10. Create custom context managers with __enter__/__exit__ or @contextmanager.
 
 Next: Chapter 8 — Modules, Iterators, Generators & Decorators
 """)
